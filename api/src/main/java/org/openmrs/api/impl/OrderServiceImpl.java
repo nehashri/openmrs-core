@@ -171,7 +171,7 @@ public class OrderServiceImpl extends BaseOpenmrsService implements OrderService
 			}
 			stopOrder(previousOrder, aMomentBefore(order.getDateActivated()), isRetrospective);
 		} else if (DISCONTINUE == order.getAction()) {
-			discontinueExistingOrdersIfNecessary(order);
+			discontinueExistingOrdersIfNecessary(order, isRetrospective);
 		}
 
 		if (previousOrder != null) {
@@ -322,9 +322,10 @@ public class OrderServiceImpl extends BaseOpenmrsService implements OrderService
 	 * exception
 	 *
 	 * @param order
+	 * @param isRetrospective
 	 */
 	//Ignore and return if this is not an order to discontinue
-	private void discontinueExistingOrdersIfNecessary(Order order) {
+	private void discontinueExistingOrdersIfNecessary(Order order, boolean isRetrospective) {
 		if (DISCONTINUE != order.getAction()) {
 			return;
 		}
@@ -332,13 +333,17 @@ public class OrderServiceImpl extends BaseOpenmrsService implements OrderService
 		//Mark previousOrder as discontinued if it is not already
 		Order previousOrder = order.getPreviousOrder();
 		if (previousOrder != null) {
-			stopOrder(previousOrder, aMomentBefore(order.getDateActivated()), false);
+			stopOrder(previousOrder, aMomentBefore(order.getDateActivated()), isRetrospective);
 			return;
 		}
 
 		//Mark first order found corresponding to this DC order as discontinued.
-		List<? extends Order> orders = getActiveOrders(order.getPatient(), order.getOrderType(), order.getCareSetting(),
-		    null);
+		List<? extends Order> orders;
+		if (isRetrospective)
+			orders = getActiveOrders(order.getPatient(), order.getOrderType(), order.getCareSetting(), order
+			        .getDateActivated());
+		else
+			orders = getActiveOrders(order.getPatient(), order.getOrderType(), order.getCareSetting(), null);
 		boolean isDrugOrderAndHasADrug = DrugOrder.class.isAssignableFrom(getActualType(order))
 		        && (((DrugOrder) order).getDrug() != null || ((DrugOrder) order).isNonCodedDrug());
 		Order orderToBeDiscontinued = null;
@@ -366,7 +371,7 @@ public class OrderServiceImpl extends BaseOpenmrsService implements OrderService
 		}
 		if (orderToBeDiscontinued != null) {
 			order.setPreviousOrder(orderToBeDiscontinued);
-			stopOrder(orderToBeDiscontinued, aMomentBefore(order.getDateActivated()), false);
+			stopOrder(orderToBeDiscontinued, aMomentBefore(order.getDateActivated()), isRetrospective);
 		}
 	}
 

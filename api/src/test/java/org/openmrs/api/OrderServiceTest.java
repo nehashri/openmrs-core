@@ -3110,4 +3110,51 @@ public class OrderServiceTest extends BaseContextSensitiveTest {
 		assertNotNull(orderService.getOrder(saveOrder.getOrderId()));
 	}
 	
+	@Test
+	public void saveRetrospectiveOrder_shouldDiscontinueOrderInRetrospectiveEntry() throws Exception {
+		executeDataSet("org/openmrs/api/include/OrderServiceTest-ordersWithAutoExpireDate.xml");
+		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss.S");
+		Date originalOrderDateActivated = dateFormat.parse("2008-11-19 09:24:10.0");
+		Date discontinuationOrderDate = DateUtils.addDays(originalOrderDateActivated, 2);
+
+		Order originalOrder = orderService.getOrder(201);
+		assertNull(originalOrder.getDateStopped());
+		assertEquals(dateFormat.parse("2008-11-23 09:24:09.0"), originalOrder.getAutoExpireDate());
+		assertFalse(originalOrder.isActive());
+		assertTrue(originalOrder.isActive(discontinuationOrderDate));
+
+		Order discontinueationOrder = originalOrder.cloneForDiscontinuing();
+		discontinueationOrder.setPreviousOrder(originalOrder);
+		discontinueationOrder.setEncounter(encounterService.getEncounter(17));
+		discontinueationOrder.setOrderer(providerService.getProvider(1));
+		discontinueationOrder.setDateActivated(discontinuationOrderDate);
+		orderService.saveRetrospectiveOrder(discontinueationOrder, null);
+
+		assertNotNull(originalOrder.getDateStopped());
+		assertEquals(discontinueationOrder.getAutoExpireDate(), discontinueationOrder.getDateActivated());
+	}
+
+	@Test
+	public void saveRetrospectiveOrder_shouldDiscontinueAndStopActiveOrderInRetrospectiveEntry() throws Exception {
+		executeDataSet("org/openmrs/api/include/OrderServiceTest-ordersWithAutoExpireDate.xml");
+		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss.S");
+		Date originalOrderDateActivated = dateFormat.parse("2008-11-19 09:24:10.0");
+		Date discontinuationOrderDate = DateUtils.addDays(originalOrderDateActivated, 2);
+
+		Order originalOrder = orderService.getOrder(202);
+		assertNull(originalOrder.getDateStopped());
+		assertEquals(dateFormat.parse("2008-11-23 09:24:09.0"), originalOrder.getAutoExpireDate());
+		assertFalse(originalOrder.isActive());
+		assertTrue(originalOrder.isActive(discontinuationOrderDate));
+
+		Order discontinuationOrder = originalOrder.cloneForDiscontinuing();
+		discontinuationOrder.setPreviousOrder(null);
+		discontinuationOrder.setEncounter(encounterService.getEncounter(17));
+		discontinuationOrder.setOrderer(providerService.getProvider(1));
+		discontinuationOrder.setDateActivated(discontinuationOrderDate);
+		orderService.saveRetrospectiveOrder(discontinuationOrder, null);
+
+		assertNotNull(originalOrder.getDateStopped());
+		assertEquals(discontinuationOrder.getAutoExpireDate(), discontinuationOrder.getDateActivated());
+	}
 }
